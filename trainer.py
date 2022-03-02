@@ -73,7 +73,6 @@ class Trainer(object):
 
 def get_test_results(model, task, dataset: DataSet, trainer_args: TrainerArgs, train_loader, test_loader, device)\
         -> List[Tuple[str, float]]:
-    clas_or_seg = task in [Task.Classification]
     SO3_train_loss, SO3_train_acc = test(model=model, task=task, dataset=dataset,
                                          loader=train_loader, SO3_rotate=True, device=device)
     SO3_test_loss, SO3_test_acc = test(model=model, task=task, dataset=dataset,
@@ -88,15 +87,13 @@ def get_test_results(model, task, dataset: DataSet, trainer_args: TrainerArgs, t
                                        loader=test_loader, SO3_rotate=False, device=device)
         results_list += [('Z Train Loss', Z_train_loss),
                          ('Z Test Loss', Z_test_loss)]
-        if clas_or_seg:
-            results_list += [('Z Train Acc', Z_train_acc),
-                             ('Z Test Acc', Z_test_acc)]
+        results_list += [('Z Train Acc', Z_train_acc),
+                         ('Z Test Acc', Z_test_acc)]
 
     results_list += [('SO3 Train Loss', SO3_train_loss),
                      ('SO3 Test Loss', SO3_test_loss)]
-    if clas_or_seg:
-        results_list += [('SO3 Train Acc', SO3_train_acc),
-                         ('SO3 Test Acc', SO3_test_acc)]
+    results_list += [('SO3 Train Acc', SO3_train_acc),
+                     ('SO3 Test Acc', SO3_test_acc)]
 
     return results_list
 
@@ -119,17 +116,13 @@ def test(model, task: Task, dataset: DataSet, loader, SO3_rotate: bool, device) 
     loss = task.get_loss()
 
     total_loss = correct = 0
-    num_of_elements = 0 if task is Task.Segmentation else len(loader.dataset)
+    num_of_elements = len(loader.dataset)
     for data in loader:
         data = prepare_raw_data(data=data, dataset=dataset, loader=loader,
                                 SO3_rotate=SO3_rotate).to(device=device)
         model_output = model(x=data.pos)
+        
         total_loss += loss(model_output, data.y).item()
-
-        if task in [Task.Classification, Task.Segmentation]:
-            correct += model_output.argmax(dim=1).eq(data.y).sum().item()
-
-        if task is Task.Segmentation:
-            num_of_elements += data.num_nodes
+        correct += model_output.argmax(dim=1).eq(data.y).sum().item()
 
     return round(total_loss / len(loader), ROUND_DIGITS), round(correct / num_of_elements, ROUND_DIGITS)
